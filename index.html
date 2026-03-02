@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NSB Practice Quiz</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════ HOME SCREEN -->
+  <div id="screen-home" class="screen active">
+    <header class="home-header">
+      <h1>NSB Practice Quiz</h1>
+      <p class="subtitle">National Science Bowl · High School</p>
+    </header>
+
+    <main class="home-main">
+
+      <!-- Filters -->
+      <section class="filter-panel card">
+        <h2 class="panel-title">Filters</h2>
+
+        <div class="filter-group">
+          <span class="filter-label">Year</span>
+          <div class="check-row">
+            <label class="check-label"><input type="checkbox" name="year" value="2020" checked> 2020</label>
+            <label class="check-label"><input type="checkbox" name="year" value="2021" checked> 2021</label>
+            <label class="check-label"><input type="checkbox" name="year" value="2022" checked> 2022</label>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-label">Category</span>
+          <div class="check-row">
+            <label class="check-label"><input type="checkbox" name="category" value="Biology" checked><span class="cat-dot" data-cat="Biology"></span>Biology</label>
+            <label class="check-label"><input type="checkbox" name="category" value="Chemistry" checked><span class="cat-dot" data-cat="Chemistry"></span>Chemistry</label>
+            <label class="check-label"><input type="checkbox" name="category" value="Earth &amp; Space" checked><span class="cat-dot" data-cat="Earth &amp; Space"></span>Earth &amp; Space</label>
+            <label class="check-label"><input type="checkbox" name="category" value="Energy" checked><span class="cat-dot" data-cat="Energy"></span>Energy</label>
+            <label class="check-label"><input type="checkbox" name="category" value="Math" checked><span class="cat-dot" data-cat="Math"></span>Math</label>
+            <label class="check-label"><input type="checkbox" name="category" value="Physics" checked><span class="cat-dot" data-cat="Physics"></span>Physics</label>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <div class="filter-group">
+            <span class="filter-label">Question Type</span>
+            <div class="radio-row">
+              <label class="radio-label"><input type="radio" name="qtype" value="all" checked> All</label>
+              <label class="radio-label"><input type="radio" name="qtype" value="Toss-Up"> Toss-Up</label>
+              <label class="radio-label"><input type="radio" name="qtype" value="Bonus"> Bonus</label>
+            </div>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Format</span>
+            <div class="radio-row">
+              <label class="radio-label"><input type="radio" name="qformat" value="all" checked> All</label>
+              <label class="radio-label"><input type="radio" name="qformat" value="Short Answer"> Short Answer</label>
+              <label class="radio-label"><input type="radio" name="qformat" value="Multiple Choice"> Multiple Choice</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-label">Difficulty</span>
+          <div class="radio-row">
+            <label class="radio-label"><input type="radio" name="difficulty" value="all" checked> All</label>
+            <label class="radio-label"><input type="radio" name="difficulty" value="Easy"> Easy (Rd 1–4)</label>
+            <label class="radio-label"><input type="radio" name="difficulty" value="Medium"> Medium (Rd 5–8)</label>
+            <label class="radio-label"><input type="radio" name="difficulty" value="Hard"> Hard (Rd 9–12)</label>
+            <label class="radio-label"><input type="radio" name="difficulty" value="Challenging"> Challenging (Rd 13+)</label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Launch panel -->
+      <aside class="launcher card">
+        <div id="match-count" class="match-count">Loading…</div>
+
+        <div class="filter-group">
+          <label class="filter-label" for="question-count">Number of Questions</label>
+          <input type="number" id="question-count" value="20" min="1" class="count-input">
+        </div>
+
+        <button id="start-btn" class="btn btn-primary btn-large" disabled>Start Quiz</button>
+        <p class="hint-text">Practice Mode · Self-paced, no timer</p>
+      </aside>
+
+    </main>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════ QUIZ SCREEN -->
+  <div id="screen-quiz" class="screen">
+
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <header class="quiz-header">
+      <div class="qh-left">
+        <span id="q-counter" class="q-counter">Question 1 of 20</span>
+        <span id="q-score"   class="q-score"></span>
+      </div>
+      <div class="qh-right">
+        <span id="q-badge" class="cat-badge"></span>
+        <span id="q-info"  class="q-info"></span>
+      </div>
+    </header>
+
+    <main class="quiz-main">
+      <div class="question-card card">
+
+        <p id="question-text" class="question-text"></p>
+
+        <!-- Multiple Choice options -->
+        <div id="mc-options" class="mc-options hidden"></div>
+
+        <!-- Short Answer: show answer button -->
+        <div id="sa-reveal" class="sa-reveal hidden">
+          <button id="show-answer-btn" class="btn btn-secondary">Show Answer</button>
+        </div>
+
+        <!-- Answer reveal area -->
+        <div id="answer-area" class="answer-area hidden">
+          <div id="answer-display" class="answer-display"></div>
+          <div id="self-grade" class="self-grade hidden">
+            <p class="self-grade-prompt">Did you get it right?</p>
+            <div class="self-grade-btns">
+              <button id="grade-yes" class="btn btn-correct">✓ Yes</button>
+              <button id="grade-no"  class="btn btn-wrong">✗ No</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <footer class="quiz-footer">
+      <div class="quiz-nav">
+        <button id="back-btn" class="btn btn-ghost hidden">← Back</button>
+        <button id="skip-btn" class="btn btn-ghost">Skip</button>
+        <button id="next-btn" class="btn btn-primary hidden">Next →</button>
+      </div>
+      <button id="end-btn" class="btn btn-outline-danger">End Quiz</button>
+    </footer>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ RESULTS SCREEN -->
+  <div id="screen-results" class="screen">
+
+    <header class="results-header">
+      <h1>Quiz Complete</h1>
+    </header>
+
+    <main class="results-main">
+
+      <div class="score-card card">
+        <div id="score-fraction" class="score-fraction"></div>
+        <div id="score-pct"      class="score-pct"></div>
+      </div>
+
+      <section class="card results-section">
+        <h2 class="section-title">Performance by Category</h2>
+        <div id="cat-breakdown"></div>
+      </section>
+
+      <section class="card results-section">
+        <h2 class="section-title">Question Review</h2>
+        <div id="q-review"></div>
+      </section>
+
+    </main>
+
+    <footer class="results-footer">
+      <button id="retry-btn"    class="btn btn-secondary">Retry Same Questions</button>
+      <button id="new-quiz-btn" class="btn btn-primary">New Quiz</button>
+    </footer>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

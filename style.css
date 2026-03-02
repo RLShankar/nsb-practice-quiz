@@ -1,0 +1,492 @@
+/* ── Reset & Custom Properties ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #f0f4f8;
+  --surface:   #ffffff;
+  --border:    #e2e8f0;
+  --text:      #1e293b;
+  --text-2:    #475569;
+  --text-3:    #94a3b8;
+  --primary:   #4f46e5;
+  --primary-h: #4338ca;
+  --radius:    12px;
+  --shadow:    0 1px 3px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.05);
+
+  /* Outcome colors */
+  --correct:    #059669;
+  --correct-bg: #ecfdf5;
+  --correct-bd: #6ee7b7;
+  --wrong:      #dc2626;
+  --wrong-bg:   #fef2f2;
+  --wrong-bd:   #fca5a5;
+
+  /* Category palette */
+  --cat-Biology:       #14b8a6;
+  --cat-Chemistry:     #10b981;
+  --cat-Earth--Space:  #64748b;
+  --cat-Energy:        #f59e0b;
+  --cat-Math:          #3b82f6;
+  --cat-Physics:       #8b5cf6;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* ── Screens ────────────────────────────────────────────────────────────────── */
+.screen         { display: none; min-height: 100vh; flex-direction: column; }
+.screen.active  { display: flex; }
+.hidden         { display: none !important; }
+
+/* ── Card ───────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem 1.15rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.13s, box-shadow 0.13s, transform 0.08s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.btn-primary   { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-h); box-shadow: var(--shadow-md); }
+
+.btn-secondary { background: var(--bg); color: var(--text); border: 1.5px solid var(--border); }
+.btn-secondary:hover:not(:disabled) { background: var(--border); }
+
+.btn-ghost     { background: transparent; color: var(--text-2); border: 1.5px solid var(--border); }
+.btn-ghost:hover:not(:disabled) { background: var(--bg); }
+
+.btn-outline-danger { background: transparent; color: var(--wrong); border: 1.5px solid var(--wrong-bd); }
+.btn-outline-danger:hover { background: var(--wrong-bg); }
+
+.btn-correct {
+  background: var(--correct-bg); color: var(--correct);
+  border: 1.5px solid var(--correct-bd);
+  font-size: 1rem; padding: 0.65rem 1.75rem;
+}
+.btn-correct:hover { background: #d1fae5; }
+
+.btn-wrong {
+  background: var(--wrong-bg); color: var(--wrong);
+  border: 1.5px solid var(--wrong-bd);
+  font-size: 1rem; padding: 0.65rem 1.75rem;
+}
+.btn-wrong:hover { background: #fee2e2; }
+
+.btn-large { font-size: 1.05rem; padding: 0.8rem 1.5rem; width: 100%; }
+
+/* ════════════════════════════════════════════════════════════════ HOME SCREEN */
+
+.home-header {
+  text-align: center;
+  padding: 2.5rem 1rem 1.25rem;
+}
+.home-header h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: -0.5px;
+}
+.home-header .subtitle {
+  color: var(--text-2);
+  margin-top: 0.25rem;
+}
+
+.home-main {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0 1.5rem 2.5rem;
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+  flex: 1;
+  align-items: flex-start;
+}
+
+/* Filter panel */
+.filter-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+}
+.panel-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-3);
+}
+.filter-group { display: flex; flex-direction: column; gap: 0.5rem; }
+.filter-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.check-row, .radio-row { display: flex; flex-wrap: wrap; gap: 0.45rem 1rem; }
+
+.check-label, .radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text);
+}
+.check-label input, .radio-label input {
+  width: 15px; height: 15px;
+  cursor: pointer;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+}
+.filter-row { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.filter-row .filter-group { flex: 1; min-width: 180px; }
+
+/* Category color dots */
+.cat-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cat-dot[data-cat="Biology"]       { background: var(--cat-Biology); }
+.cat-dot[data-cat="Chemistry"]     { background: var(--cat-Chemistry); }
+.cat-dot[data-cat="Earth & Space"] { background: var(--cat-Earth--Space); }
+.cat-dot[data-cat="Energy"]        { background: var(--cat-Energy); }
+.cat-dot[data-cat="Math"]          { background: var(--cat-Math); }
+.cat-dot[data-cat="Physics"]       { background: var(--cat-Physics); }
+
+/* Launch sidebar */
+.launcher {
+  width: 230px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  position: sticky;
+  top: 1rem;
+}
+.match-count {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary);
+  padding: 0.7rem 1rem;
+  background: #ede9fe;
+  border-radius: 8px;
+  text-align: center;
+  line-height: 1.4;
+}
+.match-count.zero { color: var(--wrong); background: var(--wrong-bg); }
+
+.count-input {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--bg);
+  outline: none;
+  font-family: inherit;
+}
+.count-input:focus { border-color: var(--primary); }
+
+.hint-text { font-size: 0.8rem; color: var(--text-3); text-align: center; }
+
+/* ═════════════════════════════════════════════════════════════════ QUIZ SCREEN */
+
+/* Thin progress bar pinned to top */
+.progress-track { height: 4px; background: var(--border); width: 100%; flex-shrink: 0; }
+.progress-fill  { height: 100%; background: var(--primary); transition: width 0.3s ease; width: 0; }
+
+/* Quiz header strip */
+.quiz-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.qh-left  { display: flex; align-items: center; gap: 1.25rem; }
+.qh-right { display: flex; align-items: center; gap: 0.75rem; }
+
+.q-counter { font-weight: 700; font-size: 0.95rem; }
+.q-score   { color: var(--text-2); font-size: 0.9rem; font-weight: 600; }
+.q-info    { font-size: 0.82rem; color: var(--text-3); }
+
+/* Category badge pill */
+.cat-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.cat-badge[data-cat="Biology"]       { background: var(--cat-Biology); }
+.cat-badge[data-cat="Chemistry"]     { background: var(--cat-Chemistry); }
+.cat-badge[data-cat="Earth & Space"] { background: var(--cat-Earth--Space); }
+.cat-badge[data-cat="Energy"]        { background: var(--cat-Energy); }
+.cat-badge[data-cat="Math"]          { background: var(--cat-Math); }
+.cat-badge[data-cat="Physics"]       { background: var(--cat-Physics); }
+
+/* Quiz main content */
+.quiz-main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem 1.5rem;
+  overflow-y: auto;
+}
+.question-card {
+  max-width: 700px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.question-text {
+  font-size: 1.2rem;
+  line-height: 1.75;
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* Multiple Choice */
+.mc-options { display: flex; flex-direction: column; gap: 0.55rem; }
+.mc-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.98rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.5;
+  transition: border-color 0.13s, background 0.13s;
+  font-family: inherit;
+  width: 100%;
+}
+.mc-option:hover:not(:disabled) { border-color: var(--primary); background: #ede9fe; }
+.mc-option:disabled { cursor: default; }
+.mc-option.correct  { background: var(--correct-bg); border-color: var(--correct); color: var(--correct); font-weight: 600; }
+.mc-option.wrong    { background: var(--wrong-bg);   border-color: var(--wrong);   color: var(--wrong); }
+.mc-letter { font-weight: 800; flex-shrink: 0; min-width: 18px; }
+
+/* Short answer reveal */
+.sa-reveal { display: flex; }
+
+/* Answer area */
+.answer-area {
+  border-top: 1px solid var(--border);
+  padding-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.answer-display {
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  background: var(--bg);
+  border-left: 4px solid var(--border);
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+.answer-display.correct { background: var(--correct-bg); border-left-color: var(--correct); color: var(--correct); }
+.answer-display.wrong   { background: var(--wrong-bg);   border-left-color: var(--wrong);   color: var(--wrong); }
+
+.self-grade        { display: flex; flex-direction: column; gap: 0.65rem; }
+.self-grade-prompt { font-size: 0.95rem; font-weight: 600; color: var(--text-2); }
+.self-grade-btns   { display: flex; gap: 0.75rem; }
+
+/* Quiz footer */
+.quiz-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.9rem 1.5rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.quiz-nav { display: flex; gap: 0.65rem; align-items: center; }
+
+/* ═══════════════════════════════════════════════════════════════ RESULTS SCREEN */
+
+.results-header {
+  text-align: center;
+  padding: 2.5rem 1rem 1rem;
+}
+.results-header h1 { font-size: 1.9rem; font-weight: 800; color: var(--text); }
+
+.results-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0 1.5rem 2rem;
+  max-width: 700px;
+  margin: 0 auto;
+  width: 100%;
+  flex: 1;
+}
+
+.score-card       { text-align: center; padding: 2rem 1.5rem; }
+.score-fraction   { font-size: 3.5rem; font-weight: 800; color: var(--primary); line-height: 1; }
+.score-pct        { font-size: 1.05rem; color: var(--text-2); margin-top: 0.5rem; }
+
+.results-section  { display: flex; flex-direction: column; gap: 0; }
+.section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  margin-bottom: 1rem;
+}
+
+/* Category bar chart rows */
+.cat-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+.cat-row-name {
+  width: 110px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  flex-shrink: 0;
+}
+.cat-bar-bg {
+  flex: 1;
+  height: 10px;
+  background: var(--bg);
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.cat-bar-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
+.cat-row-score { font-size: 0.82rem; color: var(--text-2); width: 95px; text-align: right; flex-shrink: 0; }
+
+/* Question review list */
+.review-item {
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 0.45rem;
+}
+.review-item.correct { border-left-color: var(--correct); }
+.review-item.wrong   { border-left-color: var(--wrong); }
+.review-item.skipped { border-left-color: var(--text-3); }
+
+.review-item details > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.9rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.88rem;
+  background: var(--surface);
+  user-select: none;
+}
+.review-item details > summary::-webkit-details-marker { display: none; }
+.review-item details > summary::after {
+  content: '▸';
+  color: var(--text-3);
+  font-size: 0.75rem;
+  transition: transform 0.18s;
+  flex-shrink: 0;
+  margin-left: 0.25rem;
+}
+.review-item details[open] > summary::after { transform: rotate(90deg); }
+
+.review-num    { font-weight: 800; color: var(--text-2); flex-shrink: 0; }
+.review-cat    { color: var(--text-2); flex: 1; }
+.review-status { font-weight: 700; flex-shrink: 0; }
+.review-item.correct .review-status { color: var(--correct); }
+.review-item.wrong   .review-status { color: var(--wrong); }
+.review-item.skipped .review-status { color: var(--text-3); }
+
+.review-body {
+  padding: 0.75rem 0.9rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.review-q   { font-size: 0.9rem; color: var(--text); line-height: 1.55; }
+.review-ans { font-size: 0.9rem; font-weight: 600; color: var(--text-2); }
+
+/* Results footer */
+.results-footer {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .home-main        { flex-direction: column; }
+  .launcher         { width: 100%; position: static; }
+  .qh-right         { display: none; }
+  .quiz-header      { padding: 0.6rem 1rem; }
+  .quiz-main        { padding: 1rem; }
+  .question-text    { font-size: 1.05rem; }
+  .score-fraction   { font-size: 2.5rem; }
+  .results-main     { padding: 0 1rem 1.5rem; }
+  .results-footer   { flex-direction: column; }
+  .cat-row-name     { width: 80px; }
+  .home-main        { padding: 0 1rem 2rem; }
+}
