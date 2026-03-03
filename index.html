@@ -8,38 +8,56 @@
 </head>
 <body>
 
+  <!-- ══════════════════════════════════════════════ LEVEL SELECT SCREEN -->
+  <div id="screen-level" class="screen active">
+    <div class="level-select-wrap">
+      <header class="level-header">
+        <h1>NSB Practice Quiz</h1>
+        <p class="level-tagline">National Science Bowl · Choose your level to begin</p>
+      </header>
+      <div class="level-cards">
+        <button class="level-card" id="btn-hs">
+          <span class="level-card-title">High School</span>
+          <span class="level-card-count" id="hs-count">Loading…</span>
+        </button>
+        <button class="level-card" id="btn-ms">
+          <span class="level-card-title">Middle School</span>
+          <span class="level-card-count" id="ms-count">Loading…</span>
+        </button>
+      </div>
+      <footer class="app-footer">
+        Questions sourced from the <a href="https://science.osti.gov/wdts/nsb" target="_blank" rel="noopener">U.S. Department of Energy National Science Bowl®</a> ·
+        <a href="https://science.osti.gov/wdts/nsb/Regional-Competitions/Resources/HS-Sample-Questions" target="_blank" rel="noopener">HS Sample Questions</a> ·
+        <a href="https://science.osti.gov/wdts/nsb/Regional-Competitions/Resources/MS-Sample-Questions" target="_blank" rel="noopener">MS Sample Questions</a>
+        <br>
+        Built for educational use only · Not for commercial purposes ·
+        <a href="https://github.com/RLShankar/nsb-practice-quiz" target="_blank" rel="noopener">View source on GitHub</a>
+      </footer>
+    </div>
+  </div>
+
   <!-- ═══════════════════════════════════════════════════════ HOME SCREEN -->
-  <div id="screen-home" class="screen active">
+  <div id="screen-home" class="screen">
     <header class="home-header">
       <h1>NSB Practice Quiz</h1>
-      <p class="subtitle">National Science Bowl · High School</p>
+      <p class="subtitle" id="home-subtitle"></p>
+      <button id="change-level-btn" class="change-level-link">← Change Level</button>
     </header>
 
     <main class="home-main">
 
       <!-- Filters -->
-      <section class="filter-panel card">
+      <section id="filter-panel" class="filter-panel card">
         <h2 class="panel-title">Filters</h2>
 
         <div class="filter-group">
           <span class="filter-label">Year</span>
-          <div class="check-row">
-            <label class="check-label"><input type="checkbox" name="year" value="2020" checked> 2020</label>
-            <label class="check-label"><input type="checkbox" name="year" value="2021" checked> 2021</label>
-            <label class="check-label"><input type="checkbox" name="year" value="2022" checked> 2022</label>
-          </div>
+          <div class="check-row" id="year-filters"></div>
         </div>
 
         <div class="filter-group">
           <span class="filter-label">Category</span>
-          <div class="check-row">
-            <label class="check-label"><input type="checkbox" name="category" value="Biology" checked><span class="cat-dot" data-cat="Biology"></span>Biology</label>
-            <label class="check-label"><input type="checkbox" name="category" value="Chemistry" checked><span class="cat-dot" data-cat="Chemistry"></span>Chemistry</label>
-            <label class="check-label"><input type="checkbox" name="category" value="Earth &amp; Space" checked><span class="cat-dot" data-cat="Earth &amp; Space"></span>Earth &amp; Space</label>
-            <label class="check-label"><input type="checkbox" name="category" value="Energy" checked><span class="cat-dot" data-cat="Energy"></span>Energy</label>
-            <label class="check-label"><input type="checkbox" name="category" value="Math" checked><span class="cat-dot" data-cat="Math"></span>Math</label>
-            <label class="check-label"><input type="checkbox" name="category" value="Physics" checked><span class="cat-dot" data-cat="Physics"></span>Physics</label>
-          </div>
+          <div class="check-row" id="cat-filters"></div>
         </div>
 
         <div class="filter-row">
@@ -87,6 +105,14 @@
       </aside>
 
     </main>
+    <footer class="app-footer">
+      Questions sourced from the <a href="https://science.osti.gov/wdts/nsb" target="_blank" rel="noopener">U.S. Department of Energy National Science Bowl®</a> ·
+      <a href="https://science.osti.gov/wdts/nsb/Regional-Competitions/Resources/HS-Sample-Questions" target="_blank" rel="noopener">HS Sample Questions</a> ·
+      <a href="https://science.osti.gov/wdts/nsb/Regional-Competitions/Resources/MS-Sample-Questions" target="_blank" rel="noopener">MS Sample Questions</a>
+      <br>
+      Built for educational use only · Not for commercial purposes ·
+      <a href="https://github.com/RLShankar/nsb-practice-quiz" target="_blank" rel="noopener">View source on GitHub</a>
+    </footer>
   </div>
 
   <!-- ════════════════════════════════════════════════════════ QUIZ SCREEN -->

@@ -2,27 +2,32 @@
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const state = {
-  allQuestions: [],  // full dataset
-  filtered:     [],  // after filter UI
-  quiz:         [],  // selected questions for this session
+  allQuestions: [],  // full dataset (both levels)
+  level:        null,// 'HS' or 'MS', set on level selection
+  filtered:     [],  // after applying filter UI
+  quiz:         [],  // questions selected for this session
   index:        0,   // current question index (0-based)
   answers:      [],  // { question, correct, skipped }
 };
 
-// ── Category → hex color (matches style.css) ──────────────────────────────────
+// ── Category → hex color ──────────────────────────────────────────────────────
 const CAT_COLOR = {
-  'Biology':       '#14b8a6',
-  'Chemistry':     '#10b981',
-  'Earth & Space': '#64748b',
-  'Energy':        '#f59e0b',
-  'Math':          '#3b82f6',
-  'Physics':       '#8b5cf6',
+  'Astronomy':        '#6366f1',
+  'Biology':          '#14b8a6',
+  'Chemistry':        '#10b981',
+  'Earth & Space':    '#64748b',
+  'Energy':           '#f59e0b',
+  'General Science':  '#0ea5e9',
+  'Life Science':     '#84cc16',
+  'Math':             '#3b82f6',
+  'Physical Science': '#f97316',
+  'Physics':          '#8b5cf6',
 };
 
 // ── Tiny helpers ──────────────────────────────────────────────────────────────
-const $    = id  => document.getElementById(id);
-const show = id  => $(id).classList.remove('hidden');
-const hide = id  => $(id).classList.add('hidden');
+const $    = id => document.getElementById(id);
+const show = id => $(id).classList.remove('hidden');
+const hide = id => $(id).classList.add('hidden');
 
 function shuffle(arr) {
   const a = [...arr];
@@ -31,6 +36,14 @@ function shuffle(arr) {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+// Round Robin (100+) and Double Elimination (150+) rounds get human-readable labels.
+function roundLabel(round) {
+  if (round === 0)    return 'Energy Round';
+  if (round >= 150)   return `Double Elim. Rd ${round - 150}`;
+  if (round >= 100)   return `Round Robin Rd ${round - 100}`;
+  return `Round ${round}`;
 }
 
 // ── Screen navigation ─────────────────────────────────────────────────────────
@@ -47,13 +60,50 @@ async function loadData() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     state.allQuestions = data.questions;
-    applyFilters();
+
+    // Populate level-select question counts
+    const hsCount = state.allQuestions.filter(q => q.level === 'HS').length;
+    const msCount = state.allQuestions.filter(q => q.level === 'MS').length;
+    $('hs-count').textContent = `${hsCount.toLocaleString()} questions`;
+    $('ms-count').textContent = `${msCount.toLocaleString()} questions`;
   } catch (err) {
-    const el = $('match-count');
-    el.textContent = '⚠ Could not load questions. Run: python3 -m http.server';
-    el.classList.add('zero');
+    $('hs-count').textContent = '⚠ Could not load';
+    $('ms-count').textContent = 'Run: python3 -m http.server';
     console.error(err);
   }
+}
+
+// ── Level selection ───────────────────────────────────────────────────────────
+function selectLevel(level) {
+  state.level = level;
+  $('home-subtitle').textContent =
+    `National Science Bowl · ${level === 'HS' ? 'High School' : 'Middle School'}`;
+  buildFilterUI();
+  applyFilters();
+  showScreen('home');
+}
+
+// ── Dynamic filter UI ─────────────────────────────────────────────────────────
+function buildFilterUI() {
+  const levelQs = state.allQuestions.filter(q => q.level === state.level);
+
+  // Years — sorted ascending, all checked by default
+  const years = [...new Set(levelQs.map(q => q.year))].sort((a, b) => a - b);
+  $('year-filters').innerHTML = years.map(y =>
+    `<label class="check-label">
+      <input type="checkbox" name="year" value="${y}" checked> ${y}
+    </label>`
+  ).join('');
+
+  // Categories — sorted alphabetically, all checked by default
+  const cats = [...new Set(levelQs.map(q => q.category))].sort();
+  $('cat-filters').innerHTML = cats.map(cat => {
+    const safe = cat.replace(/&/g, '&amp;');
+    return `<label class="check-label">
+      <input type="checkbox" name="category" value="${safe}" checked>
+      <span class="cat-dot" data-cat="${safe}"></span>${safe}
+    </label>`;
+  }).join('');
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
@@ -70,11 +120,12 @@ function getFilters() {
 function applyFilters() {
   const f = getFilters();
   state.filtered = state.allQuestions.filter(q => {
-    if (f.years.length      && !f.years.includes(q.year))         return false;
+    if (q.level !== state.level)                                    return false;
+    if (f.years.length      && !f.years.includes(q.year))          return false;
     if (f.categories.length && !f.categories.includes(q.category)) return false;
-    if (f.qtype !== 'all'      && q.type !== f.qtype)              return false;
-    if (f.qformat !== 'all'    && q.format !== f.qformat)          return false;
-    if (f.difficulty !== 'all' && q.difficulty !== f.difficulty)   return false;
+    if (f.qtype !== 'all'      && q.type !== f.qtype)               return false;
+    if (f.qformat !== 'all'    && q.format !== f.qformat)           return false;
+    if (f.difficulty !== 'all' && q.difficulty !== f.difficulty)    return false;
     return true;
   });
 
@@ -106,8 +157,8 @@ function startQuiz() {
 
 // ── Question rendering ────────────────────────────────────────────────────────
 function renderQuestion() {
-  const q     = state.quiz[state.index];
-  const total = state.quiz.length;
+  const q      = state.quiz[state.index];
+  const total  = state.quiz.length;
   const isLast = state.index === total - 1;
 
   // Progress bar
@@ -121,10 +172,10 @@ function renderQuestion() {
   $('q-score').textContent = answered > 0 ? `Score: ${correct} / ${answered}` : '';
 
   const badge = $('q-badge');
-  badge.textContent  = `${q.category} · ${q.type}`;
-  badge.dataset.cat  = q.category;
+  badge.textContent = `${q.category} · ${q.type}`;
+  badge.dataset.cat = q.category;
 
-  $('q-info').textContent = `${q.year} · Round ${q.round} · ${q.difficulty}`;
+  $('q-info').textContent = `${q.year} · ${roundLabel(q.round)} · ${q.difficulty}`;
 
   // Question text
   $('question-text').textContent = q.question;
@@ -161,9 +212,9 @@ function renderMCOptions(q) {
   ['W', 'X', 'Y', 'Z'].forEach(letter => {
     if (!q.options?.[letter]) return;
     const btn = document.createElement('button');
-    btn.className           = 'mc-option';
-    btn.dataset.letter      = letter;
-    btn.innerHTML           = `<span class="mc-letter">${letter}</span>${q.options[letter]}`;
+    btn.className      = 'mc-option';
+    btn.dataset.letter = letter;
+    btn.innerHTML      = `<span class="mc-letter">${letter}</span>${q.options[letter]}`;
     btn.addEventListener('click', () => handleMCAnswer(letter));
     container.appendChild(btn);
   });
@@ -178,8 +229,8 @@ function handleMCAnswer(selected) {
   // Lock and highlight all options
   document.querySelectorAll('.mc-option').forEach(btn => {
     btn.disabled = true;
-    if (btn.dataset.letter === correctLetter)                  btn.classList.add('correct');
-    else if (btn.dataset.letter === selected && !correct)      btn.classList.add('wrong');
+    if (btn.dataset.letter === correctLetter)             btn.classList.add('correct');
+    else if (btn.dataset.letter === selected && !correct) btn.classList.add('wrong');
   });
 
   // Answer text
@@ -232,7 +283,7 @@ function recordAnswer(correct, skipped) {
 // ── Navigation ────────────────────────────────────────────────────────────────
 function goBack() {
   if (state.index === 0) return;
-  state.answers.pop();   // un-record the previous question's answer
+  state.answers.pop();
   state.index--;
   renderQuestion();
 }
@@ -294,9 +345,8 @@ function renderCategoryBreakdown(answers) {
 function renderReview(answers) {
   $('q-review').innerHTML = answers.map((a, i) => {
     const cls  = a.skipped ? 'skipped' : a.correct ? 'correct' : 'wrong';
-    const icon = a.skipped ? '—'        : a.correct ? '✓'        : '✗';
+    const icon = a.skipped ? '—'       : a.correct ? '✓'       : '✗';
     const q    = a.question;
-    // Escape HTML entities to avoid layout breaks from question text
     const safeQ = q.question.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const safeA = q.answer.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     return `
@@ -320,10 +370,14 @@ function renderReview(answers) {
 document.addEventListener('DOMContentLoaded', () => {
   loadData();
 
-  // Filters: any change re-runs applyFilters
-  document.querySelectorAll(
-    'input[name="year"], input[name="category"], input[name="qtype"], input[name="qformat"], input[name="difficulty"]'
-  ).forEach(el => el.addEventListener('change', applyFilters));
+  // Level select
+  $('btn-hs').addEventListener('click', () => selectLevel('HS'));
+  $('btn-ms').addEventListener('click', () => selectLevel('MS'));
+  $('change-level-btn').addEventListener('click', () => showScreen('level'));
+
+  // Filter panel — event delegation covers dynamic year/category checkboxes
+  // and the static qtype/qformat/difficulty radios
+  $('filter-panel').addEventListener('change', applyFilters);
 
   // Home
   $('start-btn').addEventListener('click', startQuiz);

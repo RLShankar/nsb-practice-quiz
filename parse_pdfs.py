@@ -14,7 +14,7 @@ import pdfplumber
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-PDF_ROOT = Path(__file__).parent.parent / "High School"
+PDF_ROOT = Path(__file__).parent.parent / "NSB_Questions"  # scans HighSchool/ and MiddleSchool/
 OUTPUT_FILE = Path(__file__).parent / "data" / "questions.json"
 
 DIFFICULTY_MAP = {
@@ -24,8 +24,13 @@ DIFFICULTY_MAP = {
 }
 
 CATEGORY_ALIASES = {
-    "Earth & Space Science": "Earth & Space",
-    "Earth and Space":       "Earth & Space",
+    "Earth & Space Science":   "Earth & Space",
+    "Earth And Space":         "Earth & Space",   # title-cased "Earth and Space"
+    "Earth And Space Science": "Earth & Space",   # title-cased form
+    "Earth Science":           "Earth & Space",   # older PDFs: EARTH SCIENCE
+    "Earth Ande Space":        "Earth & Space",   # typo in source PDF
+    "Mathematics":             "Math",            # MS PDFs use "Mathematics"
+    "Math Math":               "Math",            # parsing artifact in some MS PDFs
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -38,7 +43,9 @@ def get_difficulty(round_num: int) -> str:
 
 
 def normalize_category(raw: str) -> str:
-    raw = raw.strip()
+    # .title() normalises ALL-CAPS categories from older PDFs ("BIOLOGY" → "Biology")
+    # .rstrip(".") removes trailing periods from MS PDFs (e.g. "Life Science.")
+    raw = raw.strip().rstrip(".").strip().title()
     return CATEGORY_ALIASES.get(raw, raw)
 
 
@@ -96,10 +103,13 @@ def split_into_blocks(full_text: str) -> list[tuple[str, list[str]]]:
     return blocks
 
 
-# Regex for the header line: e.g. "4) Energy – Multiple Choice ..."
-# Handles en dash (–), em dash (—), and hyphen (-); case-insensitive format names
+# Regex for the header line. Handles three variations seen across question sets:
+#   Modern:  "4) Energy – Multiple Choice ..."   (paren, dash)
+#   Older:   "4) ENERGY Short Answer ..."         (paren, no dash)
+#   Variant: "4. ENERGY Short Answer ..."         (period, no dash)
+# The trailing period on "Multiple Choice." is also handled.
 HEADER_RE = re.compile(
-    r"^(\d+)\)\s+(.+?)\s+[–—\-]\s+(Short Answer|Multiple Choice)\s*(.*)",
+    r"^(\d+)[)\.]\s+(.+?)\s+(?:[–—\-]\s+)?(Short Answer|Multiple Choice)\.?\s*(.*)",
     re.IGNORECASE,
 )
 
@@ -110,6 +120,7 @@ def parse_block(
     year: int,
     level: str,
     round_num: int,
+    set_num: int | None = None,
 ) -> dict | None:
     """Parse a single TOSS-UP or BONUS block into a question object."""
 
@@ -154,7 +165,8 @@ def parse_block(
 
     type_str  = "Toss-Up" if block_type == "TOSS-UP" else "Bonus"
     type_code = "TU"      if block_type == "TOSS-UP" else "BN"
-    q_id = f"{year}-{level}-Rd{round_num}-{type_code}-{q_number}"
+    set_part  = f"-Set{set_num}" if set_num is not None else ""
+    q_id = f"{year}{set_part}-{level}-Rd{round_num}-{type_code}-{q_number}"
 
     return {
         "id":             q_id,
@@ -176,23 +188,41 @@ def parse_pdf(pdf_path: Path) -> tuple[list[dict], list[str]]:
     """Parse one PDF; return (questions, errors)."""
     errors = []
 
-    # Support three filename conventions:
-    #   2020: {YEAR}-{LEVEL}-Rd{ROUND}.pdf  → 2020-HS-Rd1.pdf
-    #   2022: {YEAR}-{LEVEL}-{ROUND}.pdf    → 2022-HS-1.pdf
-    #   2021: Set-{ROUND}-{LEVEL}-{YEAR}.pdf → Set-1-HS-2021.pdf
+    # Support seven filename conventions:
+    #   2020:       {YEAR}-{LEVEL}-Rd{ROUND}.pdf         → 2020-HS-Rd1.pdf
+    #   2022:       {YEAR}-{LEVEL}-{ROUND}.pdf            → 2022-HS-1.pdf
+    #   2021:       Set-{ROUND}-{LEVEL}-{YEAR}.pdf        → Set-1-HS-2021.pdf
+    #   Set-suffix: {YEAR}-Set{N}-{LEVEL}-Rd{ROUND}.pdf  → 2011-Set4-HS-Rd1.pdf
+    #   Energy:     {YEAR}-{LEVEL}-Energy.pdf             → 2007-HS-Energy.pdf (round 0)
+    #   RR:         {YEAR}-{LEVEL}-RR{N}.pdf              → 2019-MS-RR2.pdf (round 100+N)
+    #   DE:         {YEAR}-{LEVEL}-DE{N}.pdf              → 2019-MS-DE1.pdf (round 150+N)
     patterns = [
-        re.compile(r"^(\d{4})-(\w+)-Rd(\d+)\.pdf$"),           # 2020 style
-        re.compile(r"^(\d{4})-(\w+)-(\d+)\.pdf$"),              # 2022 style
-        re.compile(r"^Set-(\d+)-(\w+)-(\d{4})\.pdf$"),          # 2021 style
+        (re.compile(r"^(\d{4})-(\w+)-Rd(\d+)\.pdf$"),          "std"),
+        (re.compile(r"^(\d{4})-(\w+)-(\d+)\.pdf$"),             "std"),
+        (re.compile(r"^Set-(\d+)-(\w+)-(\d{4})\.pdf$"),         "rev"),
+        (re.compile(r"^(\d{4})-Set(\d+)-(\w+)-Rd(\d+)\.pdf$"), "set"),
+        (re.compile(r"^(\d{4})-(\w+)-Energy\.pdf$"),            "energy"),
+        (re.compile(r"^(\d{4})-(\w+)-RR(\d+)\.pdf$"),           "rr"),
+        (re.compile(r"^(\d{4})-(\w+)-DE(\d+)\.pdf$"),           "de"),
     ]
-    year, level, round_num = None, None, None
-    for i, pat in enumerate(patterns):
+    year, level, round_num, set_num = None, None, None, None
+    for pat, style in patterns:
         m = pat.match(pdf_path.name)
         if m:
-            if i < 2:  # year first
+            if style == "std":
                 year, level, round_num = int(m.group(1)), m.group(2), int(m.group(3))
-            else:       # Set-{ROUND}-{LEVEL}-{YEAR}
+            elif style == "rev":
                 round_num, level, year = int(m.group(1)), m.group(2), int(m.group(3))
+            elif style == "set":
+                year, set_num, level, round_num = (
+                    int(m.group(1)), int(m.group(2)), m.group(3), int(m.group(4))
+                )
+            elif style == "energy":
+                year, level, round_num = int(m.group(1)), m.group(2), 0
+            elif style == "rr":
+                year, level, round_num = int(m.group(1)), m.group(2), 100 + int(m.group(3))
+            elif style == "de":
+                year, level, round_num = int(m.group(1)), m.group(2), 150 + int(m.group(3))
             break
 
     if year is None:
@@ -207,7 +237,7 @@ def parse_pdf(pdf_path: Path) -> tuple[list[dict], list[str]]:
     questions = []
 
     for block_type, lines in blocks:
-        q = parse_block(block_type, lines, year, level, round_num)
+        q = parse_block(block_type, lines, year, level, round_num, set_num)
         if q:
             questions.append(q)
         else:
@@ -235,7 +265,7 @@ def main():
         return
 
     # Parse each file
-    by_year: dict[int, int] = {}
+    by_year_level: dict[tuple[int, str], int] = {}
     for pdf_path in pdf_files:
         questions, errors = parse_pdf(pdf_path)
         all_questions.extend(questions)
@@ -244,15 +274,20 @@ def main():
         for q in questions:
             years_found.add(q["year"])
             levels_found.add(q["level"])
-            by_year[q["year"]] = by_year.get(q["year"], 0) + 1
+            key = (q["year"], q["level"])
+            by_year_level[key] = by_year_level.get(key, 0) + 1
 
     # ── Summary ───────────────────────────────────────────────────────────────
     print("\n" + "=" * 60)
     print("PARSE SUMMARY")
     print("=" * 60)
-    for yr in sorted(by_year):
-        print(f"  Year {yr}: {by_year[yr]:>4} questions")
-    print(f"  Total:  {len(all_questions):>4} questions")
+    prev_level = None
+    for (yr, lvl) in sorted(by_year_level):
+        if lvl != prev_level:
+            print(f"\n  [{lvl}]")
+            prev_level = lvl
+        print(f"    Year {yr}: {by_year_level[(yr, lvl)]:>4} questions")
+    print(f"\n  Total:  {len(all_questions):>4} questions")
 
     categories = sorted({q["category"] for q in all_questions})
     print(f"\nCategories found: {categories}")
