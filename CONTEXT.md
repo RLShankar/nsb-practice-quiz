@@ -126,6 +126,69 @@ Then refresh the browser. No other changes needed.
 
 ## TODO (future phases)
 
+### Automated detection of suspicious content in questions and answers
+Some parsed questions and answers contain PDF page-footer artifacts appended to the
+real content, e.g.:
+  "W) MORE IMMIGRATION THAN EMIGRATION 2016 National Science Bowl® - Middle School Regional Events Page 3"
+
+These are caused by PDF text extraction running across page boundaries. They are not
+caught by the parser because the question/answer itself is valid — only the trailing
+garbage is wrong.
+
+**Proposed approach — a standalone audit script:**
+Write a Python script (`audit_questions.py`) that scans all entries in `questions.json`
+and flags suspicious content using heuristics, for example:
+- Answer or question text containing "Page \d+"
+- Answer or question text containing "National Science Bowl"
+- Answer or question text containing "Regional Events"
+- Answer or question text containing year patterns like "20\d\d" not at the start
+- Unusually long answers (e.g. > 100 characters) that may have garbage appended
+
+Output a report of flagged questions (ID + current text) for manual review.
+Confirmed corrections get added to `manual_corrections.json`.
+
+This could recover a meaningful number of silently-corrupted answers that currently
+look valid to the parser but are wrong for the student.
+
+### Lightweight correction tool (local, private use only)
+A local-only workflow for correcting questions that parsed but render incorrectly
+(garbled text, wrong answer, truncated question, etc.). This is higher priority than
+fixing parse failures — these questions already have valid IDs visible in the results
+review screen, so they can be identified organically during a practice session.
+
+**Workflow:**
+1. During practice, notice a bad question → note its ID from the results review
+   (e.g. `2019-MS-Rd4-TU-7`)
+2. Open `data/manual_corrections.json` and add an entry with just the fields that
+   need fixing — everything else is inherited from the original parsed data:
+   ```json
+   {
+     "corrections": [
+       {
+         "id": "2019-MS-Rd4-TU-7",
+         "question": "corrected question text here",
+         "answer": "CORRECTED ANSWER"
+       }
+     ]
+   }
+   ```
+3. Run `python3 parse_pdfs.py` — a merge step reads `manual_corrections.json`
+   and applies corrections on top of parsed data before writing `questions.json`
+4. Commit and push — corrections are version-controlled separately from the parser
+   and are never overwritten by future parser runs
+
+**Key properties:**
+- Local only — `manual_corrections.json` lives in the repo but the editing is done
+  manually; no UI needed initially
+- Corrections survive re-parsing — the merge step always re-applies them
+- Only specified fields are overridden — partial corrections are supported
+- Optionally: a small Python helper script that takes an ID as argument, prints the
+  current question data, and guides field-by-field correction entry
+
+**Priority tiers:**
+1. Parsed-but-wrong questions (identified by ID from the results review) — tackle first
+2. Failed-to-parse questions (~262, see below) — tackle separately once tier 1 is done
+
 ### Revisit parse failures (~262 questions)
 The parser silently drops ~262 questions that it cannot parse, mostly math questions from
 older sets (2007–2014) where formulas were rendered as images or used CID font encoding.
@@ -147,11 +210,107 @@ older sets (2007–2014) where formulas were rendered as images or used CID font
   is just `['1']`) — these may not be recoverable even manually.
 - The corrections file is fully additive and reversible — it does not touch any existing data.
 
+### Show question metadata in results review
+The quiz header already shows year, round, and difficulty. The one missing piece is
+the question number within the round, useful for looking up the original PDF.
+
+Recommended approach:
+- Add question number to the quiz header (small addition, low clutter)
+- Show the full question ID (e.g. "2020-HS-Rd1-TU-3") in the results review screen
+  where it's most actionable — the student has finished and wants to investigate a
+  specific question. Currently the review only shows category and type.
+
+This is a small, self-contained change to app.js and style.css only.
+
+### User feedback form on results screen (public app)
+A lightweight alternative to backend flagging for the public app. A Google Form
+(zero backend, zero cost) linked from the results screen lets users submit:
+- General feedback on app usefulness
+- Specific question IDs they believe are incorrect (the ID format like
+  "2020-HS-Rd1-TU-3" is human-readable enough to copy-paste)
+
+Implementation: a small "Share Feedback" button on the results screen.
+**Prerequisite:** user must first create the Google Form and share its URL.
+Once the URL is available, embedding it takes minutes.
+
+This elegantly solves the public flagging problem without any backend infrastructure
+and handles the abuse concern (Google Forms has basic spam controls).
+
+### Question flagging for error review (private app only)
+Flagging belongs in the private app, not the public app, for these reasons:
+- Public app is a zero-backend static site; adding write capability is a major
+  architectural change not worth making just for flagging
+- Random public users may flag correct questions they simply got wrong — noise
+  with no accountability
+- The people best qualified to flag errors are Science Bowl students/coaches
+  (the family) — exactly the private app's audience
+- Private app already needs a backend for analytics; flagging is free to add there
+- Auto-detected parse failures (from parse_pdfs.py) can be fed into the same
+  review queue in the private app
+
+### Disclose parse errors to users
+A small fraction of questions (~1%) appear garbled due to PDF parsing limitations
+(math symbols rendered as images, CID font encoding in older PDFs).
+
+Two complementary approaches to consider:
+1. **Passive disclaimer** — add a one-liner to the footer on the level-select and home
+   screens, e.g. *"Occasionally a question may appear incomplete due to PDF extraction
+   limitations."* Simple, sets expectations upfront.
+2. **In-quiz Flag button** — a small flag icon on the quiz screen letting users mark a
+   specific question as garbled. More useful: identifies *which* questions are bad,
+   produces an actionable list, and feeds naturally into the manual corrections workflow
+   described above. This is the better long-term solution.
+
+Recommendation: add the passive disclaimer first (trivial), then build the flag button
+as part of the parse-failure corrections workflow.
+
+### Short answer text input with fuzzy checking
+Currently short answer questions use a self-grade flow (student reveals answer, marks
+themselves correct/incorrect). A text input field would let the app check correctness
+automatically, making the experience feel more like a real quiz.
+
+**Recommended approach — fuzzy matching with override:**
+1. Student types their answer into a text field and submits
+2. App normalizes both the typed answer and the stored answer (lowercase, trim whitespace,
+   collapse multiple spaces, optionally strip punctuation) before comparing
+3. If they match: mark correct and show the official answer
+4. If they don't match: show incorrect with the official answer displayed, plus a small
+   "Mark as correct anyway" button to handle legitimate edge cases (e.g. valid alternate
+   phrasings, chemical formulas typed differently)
+
+This handles the most common mismatches (case sensitivity, extra spaces) without being
+brittle, and keeps human override as a safety valve. The self-grade buttons can be removed
+for short answer once this is in place.
+
+**What to avoid:** semantic/AI-based answer checking — unnecessary complexity for NSB
+answers which are short and specific (a term, a number, a name).
+
 ### Phase 3+ features (not yet started)
 - Timed mode
 - Flashcard mode
 - Team mode
 - UI polish
+
+### Private companion app with analytics (separate app, not added to public app)
+The public app intentionally has no accounts, no stored data, and no login — keep it that way.
+Personal analytics features should live in a separate private app for the family's use.
+
+**Recommended approach — separate app with lightweight backend:**
+- New repo (e.g. `nsb-practice-private`) that reuses the same questions.json and quiz engine
+- Adds a simple user selector ("Older Son" / "Younger Son") stored in localStorage — no
+  real login needed
+- Persists session results to a free hosted database (Supabase or Firebase are good options)
+- New screens to unlock:
+  - **Wrong question retry** — queue of questions answered incorrectly, for focused drilling
+  - **Category breakdown over time** — which subjects need the most work
+  - **Improvement trends** — score history per category/difficulty across sessions
+  - **Weak spots** — specific questions or topics flagged repeatedly as incorrect
+
+**Why not localStorage-only:** data is lost on cache clear and not shared across devices.
+A small hosted database solves both problems and is free at this scale.
+
+**Why not add to public app:** keeps the public app simple and zero-friction for anyone;
+avoids the complexity of accounts/auth in a publicly shared tool.
 
 ### MIT Science Bowl (explicitly deferred)
 - MIT HS resource page: https://www.mitsciencebowl.com/high-school/resources
