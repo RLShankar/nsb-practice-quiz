@@ -408,8 +408,32 @@ body {
 .mc-option.wrong    { background: var(--wrong-bg);   border-color: var(--wrong);   color: var(--wrong); }
 .mc-letter { font-weight: 800; flex-shrink: 0; min-width: 18px; }
 
-/* Short answer reveal */
+/* Short answer input */
 .sa-reveal { display: flex; }
+
+.sa-input-row {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  width: 100%;
+}
+.sa-input {
+  flex: 1;
+  padding: 0.6rem 0.85rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--bg);
+  outline: none;
+  transition: border-color 0.13s;
+}
+.sa-input:focus { border-color: var(--primary); }
+
+/* Mark as correct override */
+.mark-correct { display: flex; }
+.mark-correct .btn { font-size: 0.88rem; }
 
 /* Answer area */
 .answer-area {

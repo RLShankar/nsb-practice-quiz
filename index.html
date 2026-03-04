@@ -141,20 +141,20 @@
         <!-- Multiple Choice options -->
         <div id="mc-options" class="mc-options hidden"></div>
 
-        <!-- Short Answer: show answer button -->
+        <!-- Short Answer: text input -->
         <div id="sa-reveal" class="sa-reveal hidden">
-          <button id="show-answer-btn" class="btn btn-secondary">Show Answer</button>
+          <div class="sa-input-row">
+            <input type="text" id="sa-input" class="sa-input"
+                   placeholder="Type your answer…" autocomplete="off" spellcheck="false">
+            <button id="sa-submit-btn" class="btn btn-primary">Submit</button>
+          </div>
         </div>
 
         <!-- Answer reveal area -->
         <div id="answer-area" class="answer-area hidden">
           <div id="answer-display" class="answer-display"></div>
-          <div id="self-grade" class="self-grade hidden">
-            <p class="self-grade-prompt">Did you get it right?</p>
-            <div class="self-grade-btns">
-              <button id="grade-yes" class="btn btn-correct">✓ Yes</button>
-              <button id="grade-no"  class="btn btn-wrong">✗ No</button>
-            </div>
+          <div id="mark-correct" class="mark-correct hidden">
+            <button id="mark-correct-btn" class="btn btn-secondary">Mark as correct anyway</button>
           </div>
         </div>
 

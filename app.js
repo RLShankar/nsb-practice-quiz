@@ -38,12 +38,52 @@ function shuffle(arr) {
   return a;
 }
 
-// Round Robin (100+) and Double Elimination (150+) rounds get human-readable labels.
 function roundLabel(round) {
-  if (round === 0)    return 'Energy Round';
-  if (round >= 150)   return `Double Elim. Rd ${round - 150}`;
-  if (round >= 100)   return `Round Robin Rd ${round - 100}`;
+  if (round === 0)  return 'Energy Round';
+  if (round >= 150) return `Double Elim. Rd ${round - 150}`;
+  if (round >= 100) return `Round Robin Rd ${round - 100}`;
   return `Round ${round}`;
+}
+
+// ── Fuzzy answer matching ─────────────────────────────────────────────────────
+
+// Strip parenthetical notes, PDF garbage, and separator lines from a stored
+// answer string to extract just the primary answer text.
+// Examples:
+//   "BOND DISSOCIATION ENERGY (ALSO ACCEPT: BOND DISSOCIATION)" → "BOND DISSOCIATION ENERGY"
+//   "1500 KG·M/S (Solution: momentum = mv…)"                   → "1500 KG·M/S"
+//   "HUND'S RULE 2017 Regional High School NSB® PAGE 1"         → "HUND'S RULE"
+//   "40 Round 11 Page 6"                                         → "40"
+//   "TWO _______________"                                         → "TWO"
+function extractPrimary(raw) {
+  let s = raw;
+  s = s.replace(/\s*\(.*$/, '');                                            // strip from first '('
+  s = s.replace(/\s*[~_]{3,}.*$/, '');                                     // strip separator lines
+  s = s.replace(/\s+(Round\s+\d|Page\s+\d|\d{4}\s+Reg).*/i, '').trim();   // strip page/year refs
+  s = s.replace(/\s+(High School|Middle School)\b.*/i, '').trim();         // strip school refs
+  return s.trim();
+}
+
+// Normalize a string for comparison: lowercase, collapse whitespace,
+// strip trailing/leading punctuation.
+function normalize(s) {
+  return s.toLowerCase().replace(/\s+/g, ' ').replace(/[.,;:!?]/g, '').trim();
+}
+
+// Extract any "(ALSO ACCEPT: X, Y)" alternatives from a stored answer string.
+function extractAlts(raw) {
+  const m = raw.match(/\(\s*(?:ALSO\s+)?ACCEPT:\s*([^)]+)\)/i);
+  if (!m) return [];
+  return m[1].split(/[,;]/).map(a => normalize(extractPrimary(a.trim()))).filter(Boolean);
+}
+
+// Return true if the student's typed answer matches the stored answer,
+// either via the primary answer or any accepted alternatives.
+function fuzzyMatch(typed, stored) {
+  const typedNorm = normalize(typed.trim());
+  if (!typedNorm) return false;
+  if (typedNorm === normalize(extractPrimary(stored))) return true;
+  return extractAlts(stored).some(alt => typedNorm === alt);
 }
 
 // ── Screen navigation ─────────────────────────────────────────────────────────
@@ -61,7 +101,6 @@ async function loadData() {
     const data = await res.json();
     state.allQuestions = data.questions;
 
-    // Populate level-select question counts
     const hsCount = state.allQuestions.filter(q => q.level === 'HS').length;
     const msCount = state.allQuestions.filter(q => q.level === 'MS').length;
     $('hs-count').textContent = `${hsCount.toLocaleString()} questions`;
@@ -87,7 +126,6 @@ function selectLevel(level) {
 function buildFilterUI() {
   const levelQs = state.allQuestions.filter(q => q.level === state.level);
 
-  // Years — sorted ascending, all checked by default
   const years = [...new Set(levelQs.map(q => q.year))].sort((a, b) => a - b);
   $('year-filters').innerHTML = years.map(y =>
     `<label class="check-label">
@@ -95,7 +133,6 @@ function buildFilterUI() {
     </label>`
   ).join('');
 
-  // Categories — sorted alphabetically, all checked by default
   const cats = [...new Set(levelQs.map(q => q.category))].sort();
   $('cat-filters').innerHTML = cats.map(cat => {
     const safe = cat.replace(/&/g, '&amp;');
@@ -135,7 +172,6 @@ function applyFilters() {
   el.className   = 'match-count' + (n === 0 ? ' zero' : '');
   $('start-btn').disabled = (n === 0);
 
-  // Keep question-count input in bounds
   const inp = $('question-count');
   inp.max = n;
   if (Number(inp.value) > n) inp.value = n;
@@ -161,10 +197,8 @@ function renderQuestion() {
   const total  = state.quiz.length;
   const isLast = state.index === total - 1;
 
-  // Progress bar
   $('progress-fill').style.width = `${(state.index / total) * 100}%`;
 
-  // Header
   $('q-counter').textContent = `Question ${state.index + 1} of ${total}`;
 
   const answered = state.answers.filter(a => !a.skipped).length;
@@ -177,25 +211,24 @@ function renderQuestion() {
 
   $('q-info').textContent = `${q.year} · ${roundLabel(q.round)} · ${q.difficulty}`;
 
-  // Question text
   $('question-text').textContent = q.question;
 
   // Reset answer area
   hide('answer-area');
-  hide('self-grade');
+  hide('mark-correct');
   const display = $('answer-display');
   display.textContent = '';
   display.className   = 'answer-display';
 
-  // Next button label
+  // Reset short answer input
+  $('sa-input').value = '';
+
   $('next-btn').textContent = isLast ? 'See Results' : 'Next →';
 
-  // Reset nav
   state.index > 0 ? show('back-btn') : hide('back-btn');
   show('skip-btn');
   hide('next-btn');
 
-  // Format-specific UI
   if (q.format === 'Multiple Choice') {
     renderMCOptions(q);
     show('mc-options');
@@ -203,6 +236,7 @@ function renderQuestion() {
   } else {
     hide('mc-options');
     show('sa-reveal');
+    $('sa-input').focus();
   }
 }
 
@@ -223,17 +257,15 @@ function renderMCOptions(q) {
 // ── Answer handling ───────────────────────────────────────────────────────────
 function handleMCAnswer(selected) {
   const q             = state.quiz[state.index];
-  const correctLetter = q.answer[0]; // e.g. "X) 1 MICROMETER" → "X"
+  const correctLetter = q.answer[0];
   const correct       = selected === correctLetter;
 
-  // Lock and highlight all options
   document.querySelectorAll('.mc-option').forEach(btn => {
     btn.disabled = true;
     if (btn.dataset.letter === correctLetter)             btn.classList.add('correct');
     else if (btn.dataset.letter === selected && !correct) btn.classList.add('wrong');
   });
 
-  // Answer text
   const display       = $('answer-display');
   display.textContent = `ANSWER: ${q.answer}`;
   display.className   = `answer-display ${correct ? 'correct' : 'wrong'}`;
@@ -245,25 +277,37 @@ function handleMCAnswer(selected) {
   show('next-btn');
 }
 
-function showAnswer() {
-  const q             = state.quiz[state.index];
+function submitSAAnswer() {
+  const typed = $('sa-input').value;
+  if (!typed.trim()) return;
+
+  const q       = state.quiz[state.index];
+  const correct = fuzzyMatch(typed, q.answer);
+
   const display       = $('answer-display');
   display.textContent = `ANSWER: ${q.answer}`;
-  display.className   = 'answer-display';
+  display.className   = `answer-display ${correct ? 'correct' : 'wrong'}`;
 
   hide('sa-reveal');
   hide('skip-btn');
   hide('back-btn');
   show('answer-area');
-  show('self-grade');
+
+  recordAnswer(correct, false);
+
+  if (!correct) show('mark-correct');
+  show('next-btn');
 }
 
-function handleSelfGrade(correct) {
-  const display     = $('answer-display');
-  display.className = `answer-display ${correct ? 'correct' : 'wrong'}`;
-  hide('self-grade');
-  recordAnswer(correct, false);
-  show('next-btn');
+function markCorrect() {
+  // Override: the fuzzy match was wrong but the student's answer was acceptable
+  state.answers[state.answers.length - 1].correct = true;
+  $('answer-display').className = 'answer-display correct';
+  hide('mark-correct');
+
+  const answered = state.answers.filter(a => !a.skipped).length;
+  const correctN = state.answers.filter(a => a.correct).length;
+  $('q-score').textContent = `Score: ${correctN} / ${answered}`;
 }
 
 function skipQuestion() {
@@ -376,16 +420,15 @@ document.addEventListener('DOMContentLoaded', () => {
   $('change-level-btn').addEventListener('click', () => showScreen('level'));
 
   // Filter panel — event delegation covers dynamic year/category checkboxes
-  // and the static qtype/qformat/difficulty radios
   $('filter-panel').addEventListener('change', applyFilters);
 
   // Home
   $('start-btn').addEventListener('click', startQuiz);
 
-  // Quiz — Short Answer
-  $('show-answer-btn').addEventListener('click', showAnswer);
-  $('grade-yes').addEventListener('click', () => handleSelfGrade(true));
-  $('grade-no').addEventListener('click',  () => handleSelfGrade(false));
+  // Quiz — Short Answer input
+  $('sa-submit-btn').addEventListener('click', submitSAAnswer);
+  $('sa-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitSAAnswer(); });
+  $('mark-correct-btn').addEventListener('click', markCorrect);
 
   // Quiz — navigation
   $('back-btn').addEventListener('click', goBack);
