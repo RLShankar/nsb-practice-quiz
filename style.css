@@ -598,6 +598,7 @@ body {
 }
 .review-q   { font-size: 0.9rem; color: var(--text); line-height: 1.55; }
 .review-ans { font-size: 0.9rem; font-weight: 600; color: var(--text-2); }
+.review-id  { font-size: 0.75rem; color: var(--text-3); font-family: monospace; margin-top: 0.25rem; }
 
 /* Results footer */
 .results-footer {

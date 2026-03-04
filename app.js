@@ -217,7 +217,7 @@ function renderQuestion() {
   badge.textContent = `${q.category} · ${q.type}`;
   badge.dataset.cat = q.category;
 
-  $('q-info').textContent = `${q.year} · ${roundLabel(q.round)} · ${q.difficulty}`;
+  $('q-info').textContent = `${q.year} · ${roundLabel(q.round)} · Q${q.questionNumber} · ${q.difficulty}`;
 
   $('question-text').textContent = q.question;
 
@@ -416,6 +416,7 @@ function renderReview(answers) {
           <div class="review-body">
             <p class="review-q">${safeQ}</p>
             <p class="review-ans">Answer: ${safeA}</p>
+            <p class="review-id">${q.id}</p>
           </div>
         </details>
       </div>`;
