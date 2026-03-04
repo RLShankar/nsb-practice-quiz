@@ -86,6 +86,14 @@ function fuzzyMatch(typed, stored) {
   return extractAlts(stored).some(alt => typedNorm === alt);
 }
 
+// Return true if the typed answer matches a "(DO NOT ACCEPT: ...)" entry.
+function matchesDoNotAccept(typed, stored) {
+  const m = stored.match(/\(\s*DO NOT ACCEPT:\s*([^)]+)\)/i);
+  if (!m) return false;
+  const typedNorm = normalize(typed.trim());
+  return m[1].split(/[,;]/).some(a => normalize(extractPrimary(a.trim())) === typedNorm);
+}
+
 // ── Screen navigation ─────────────────────────────────────────────────────────
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -216,6 +224,7 @@ function renderQuestion() {
   // Reset answer area
   hide('answer-area');
   hide('mark-correct');
+  hide('dna-note');
   const display = $('answer-display');
   display.textContent = '';
   display.className   = 'answer-display';
@@ -295,7 +304,10 @@ function submitSAAnswer() {
 
   recordAnswer(correct, false);
 
-  if (!correct) show('mark-correct');
+  if (!correct) {
+    if (matchesDoNotAccept(typed, q.answer)) show('dna-note');
+    show('mark-correct');
+  }
   show('next-btn');
 }
 
