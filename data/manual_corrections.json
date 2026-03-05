@@ -18,8 +18,9 @@
     },
     {
       "id": "2013-HS-Rd4-BN-21",
-      "status": "pending_research",
-      "notes": "Question about sides of a right triangle with lengths m, m+n, and m+n. Math symbols in the equation are garbled in the parsed text. Needs visual inspection of the original PDF to determine correct equation and provide fix."
+      "status": "applied",
+      "question": "The sides of a right triangle have lengths m, m+n, m+2n. If n is positive, what is the ratio of m to n?",
+      "notes": "Garbled math symbols in parsed text. Corrected via PDF inspection."
     }
   ]
 }
