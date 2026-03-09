@@ -7,7 +7,20 @@ const state = {
   filtered:     [],  // after applying filter UI
   quiz:         [],  // questions selected for this session
   index:        0,   // current question index (0-based)
-  answers:      [],  // { question, correct, skipped }
+  answers:      [],  // { question, correct, skipped, points }
+  // Timed mode
+  mode:             'practice', // 'practice' or 'timed'
+  alwaysShowBonus:  false,
+  timerInterval:    null,       // setInterval ID
+  timerStart:       0,          // timestamp when timer started
+  timerDuration:    0,          // total seconds for current timer
+  timerPaused:      true,       // timer hasn't started yet (coach hasn't pressed spacebar)
+  buzzed:           false,      // team has buzzed in (toss-up only)
+  points:           0,          // NSB-style points (timed mode)
+  // Toss-up/bonus pairing for timed mode
+  pairs:            [],         // [{tossup, bonus}, ...] — used in timed mode
+  pairIndex:        0,          // current pair
+  showingBonus:     false,      // currently showing the bonus of a pair
 };
 
 // ── Category → hex color ──────────────────────────────────────────────────────
@@ -43,6 +56,107 @@ function roundLabel(round) {
   if (round >= 150) return `Double Elim. Rd ${round - 150}`;
   if (round >= 100) return `Round Robin Rd ${round - 100}`;
   return `Round ${round}`;
+}
+
+// ── Timer ────────────────────────────────────────────────────────────────────
+
+function showTimerBar(seconds) {
+  // Show the timer bar in its initial full state, but don't start counting
+  show('timer-bar');
+  hide('timer-warning');
+  const fill = $('timer-fill');
+  fill.style.width = '100%';
+  fill.classList.remove('urgent');
+  const cd = $('timer-countdown');
+  cd.textContent = `${seconds}s`;
+  cd.classList.remove('urgent');
+}
+
+function startTimer(seconds, onExpire) {
+  stopTimer();
+  state.timerDuration = seconds;
+  state.timerStart = Date.now();
+  state.timerPaused = false;
+
+  show('timer-bar');
+  hide('timer-prompt');
+  const fill = $('timer-fill');
+  fill.classList.remove('urgent');
+  hide('timer-warning');
+
+  state.timerInterval = setInterval(() => {
+    const elapsed = (Date.now() - state.timerStart) / 1000;
+    const remaining = Math.max(0, seconds - elapsed);
+    const pct = (remaining / seconds) * 100;
+    fill.style.width = `${pct}%`;
+
+    // Update numeric countdown
+    const cd = $('timer-countdown');
+    cd.textContent = `${Math.ceil(remaining)}s`;
+
+    // Urgent color when ≤30% time left
+    if (pct <= 30) {
+      fill.classList.add('urgent');
+      cd.classList.add('urgent');
+    }
+
+    // "5 SECONDS" warning for bonus questions (20s timer)
+    if (seconds > 5 && remaining <= 5 && remaining > 0) {
+      show('timer-warning');
+    }
+
+    if (remaining <= 0) {
+      stopTimer();
+      $('question-card').classList.add('timer-expired');
+      setTimeout(() => $('question-card').classList.remove('timer-expired'), 500);
+      onExpire();
+    }
+  }, 100);
+}
+
+function stopTimer() {
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
+  }
+  hide('timer-warning');
+}
+
+function handleSpaceKey() {
+  if (state.mode !== 'timed') return;
+  if (!state.timerPaused) return; // timer already running, space does nothing
+  if (state.buzzed) return;       // already buzzed
+
+  // Start the main timer (coach finished reading)
+  const seconds = state.showingBonus ? 20 : 5;
+  startTimer(seconds, () => onTimerExpire());
+}
+
+function handleBuzzKey() {
+  if (state.mode !== 'timed') return;
+  if (state.showingBonus) return; // no buzz on bonus
+  if (state.buzzed) return;       // already buzzed
+
+  // Buzz in — stop any running timer, start 2s answer timer
+  stopTimer();
+  state.buzzed = true;
+  hide('timer-prompt');
+  startTimer(2, () => onTimerExpire());
+}
+
+// ── Toss-up/Bonus pairing ────────────────────────────────────────────────────
+
+function buildPairs(questions) {
+  // Group by year+round+questionNumber, find toss-up/bonus pairs
+  const map = {};
+  questions.forEach(q => {
+    const key = `${q.year}-${q.round}-${q.questionNumber}`;
+    if (!map[key]) map[key] = {};
+    if (q.type === 'Toss-Up') map[key].tossup = q;
+    else if (q.type === 'Bonus') map[key].bonus = q;
+  });
+  // Only keep complete pairs
+  return Object.values(map).filter(p => p.tossup && p.bonus);
 }
 
 // ── Fuzzy answer matching ─────────────────────────────────────────────────────
@@ -174,29 +288,68 @@ function applyFilters() {
     return true;
   });
 
-  const n  = state.filtered.length;
-  const el = $('match-count');
-  el.textContent = `${n.toLocaleString()} question${n !== 1 ? 's' : ''} match your filters`;
-  el.className   = 'match-count' + (n === 0 ? ' zero' : '');
-  $('start-btn').disabled = (n === 0);
+  updateMatchCount();
+}
 
-  const inp = $('question-count');
-  inp.max = n;
-  if (Number(inp.value) > n) inp.value = n;
+function updateMatchCount() {
+  const isTimed = document.querySelector('input[name="mode"]:checked')?.value === 'timed';
+
+  if (isTimed) {
+    const pairs = buildPairs(state.filtered);
+    const n = pairs.length;
+    const el = $('match-count');
+    el.textContent = `${n.toLocaleString()} toss-up/bonus pair${n !== 1 ? 's' : ''} match`;
+    el.className   = 'match-count' + (n === 0 ? ' zero' : '');
+    $('start-btn').disabled = (n === 0);
+    const inp = $('question-count');
+    inp.max = n;
+    if (Number(inp.value) > n) inp.value = n;
+  } else {
+    const n  = state.filtered.length;
+    const el = $('match-count');
+    el.textContent = `${n.toLocaleString()} question${n !== 1 ? 's' : ''} match your filters`;
+    el.className   = 'match-count' + (n === 0 ? ' zero' : '');
+    $('start-btn').disabled = (n === 0);
+    const inp = $('question-count');
+    inp.max = n;
+    if (Number(inp.value) > n) inp.value = n;
+  }
 }
 
 // ── Quiz start ────────────────────────────────────────────────────────────────
 function startQuiz() {
-  const count = Math.min(
-    Math.max(1, parseInt($('question-count').value) || 20),
-    state.filtered.length,
-  );
-  state.quiz    = shuffle(state.filtered).slice(0, count);
-  state.index   = 0;
-  state.answers = [];
+  state.mode = document.querySelector('input[name="mode"]:checked').value;
+  state.alwaysShowBonus = $('always-bonus').checked;
 
-  showScreen('quiz');
-  renderQuestion();
+  if (state.mode === 'timed') {
+    const allPairs = buildPairs(state.filtered);
+    const count = Math.min(
+      Math.max(1, parseInt($('question-count').value) || 20),
+      allPairs.length,
+    );
+    state.pairs      = shuffle(allPairs).slice(0, count);
+    state.pairIndex  = 0;
+    state.showingBonus = false;
+    state.points     = 0;
+    state.quiz       = []; // not used in timed mode
+    state.index      = 0;
+    state.answers    = [];
+
+    showScreen('quiz');
+    renderTimedQuestion();
+  } else {
+    const count = Math.min(
+      Math.max(1, parseInt($('question-count').value) || 20),
+      state.filtered.length,
+    );
+    state.quiz    = shuffle(state.filtered).slice(0, count);
+    state.index   = 0;
+    state.answers = [];
+    state.pairs   = [];
+
+    showScreen('quiz');
+    renderQuestion();
+  }
 }
 
 // ── Question rendering ────────────────────────────────────────────────────────
@@ -204,6 +357,11 @@ function renderQuestion() {
   const q      = state.quiz[state.index];
   const total  = state.quiz.length;
   const isLast = state.index === total - 1;
+
+  // Hide timer in practice mode
+  hide('timer-bar');
+  hide('timer-prompt');
+  hide('timer-warning');
 
   $('progress-fill').style.width = `${(state.index / total) * 100}%`;
 
@@ -258,7 +416,10 @@ function renderMCOptions(q) {
     btn.className      = 'mc-option';
     btn.dataset.letter = letter;
     btn.innerHTML      = `<span class="mc-letter">${letter}</span>${q.options[letter]}`;
-    btn.addEventListener('click', () => handleMCAnswer(letter));
+    btn.addEventListener('click', () => {
+      if (state.mode === 'timed') handleTimedMCAnswer(letter);
+      else handleMCAnswer(letter);
+    });
     container.appendChild(btn);
   });
 }
@@ -322,6 +483,203 @@ function markCorrect() {
   $('q-score').textContent = `Score: ${correctN} / ${answered}`;
 }
 
+// ── Timed mode rendering ─────────────────────────────────────────────────────
+
+function renderTimedQuestion() {
+  const pair  = state.pairs[state.pairIndex];
+  const q     = state.showingBonus ? pair.bonus : pair.tossup;
+  const total = state.pairs.length;
+
+  // Progress bar: based on pair index
+  $('progress-fill').style.width = `${(state.pairIndex / total) * 100}%`;
+
+  // Counter
+  const pairLabel = state.showingBonus ? 'Bonus' : 'Toss-Up';
+  $('q-counter').textContent = `Pair ${state.pairIndex + 1} of ${total} · ${pairLabel}`;
+
+  // Score: show points
+  $('q-score').textContent = `${state.points} pts`;
+
+  // Badge + info
+  const badge = $('q-badge');
+  badge.textContent = `${q.category} · ${q.type}`;
+  badge.dataset.cat = q.category;
+  $('q-info').textContent = `${q.year} · ${roundLabel(q.round)} · Q${q.questionNumber} · ${q.difficulty}`;
+
+  // Question text
+  $('question-text').textContent = q.question;
+
+  // Reset answer area
+  hide('answer-area');
+  hide('mark-correct');
+  hide('dna-note');
+  const display = $('answer-display');
+  display.textContent = '';
+  display.className   = 'answer-display';
+
+  // Reset SA input
+  $('sa-input').value = '';
+
+  // Navigation: no back button in timed mode
+  hide('back-btn');
+  show('skip-btn');
+  hide('next-btn');
+
+  // Next button text
+  const isLastPair = state.pairIndex === total - 1;
+  // "See Results" only on the very last question of the very last pair
+  const isLastQuestion = isLastPair && (state.showingBonus || !state.alwaysShowBonus);
+  $('next-btn').textContent = isLastQuestion ? 'See Results' : 'Next →';
+
+  // Show MC or SA
+  if (q.format === 'Multiple Choice') {
+    renderMCOptions(q);
+    show('mc-options');
+    hide('sa-reveal');
+  } else {
+    hide('mc-options');
+    show('sa-reveal');
+    $('sa-input').focus();
+  }
+
+  // Show timer bar in paused state, wait for spacebar
+  const seconds = state.showingBonus ? 20 : 5;
+  state.timerPaused = true;
+  state.buzzed = false;
+  showTimerBar(seconds);
+  show('timer-prompt');
+  $('timer-prompt').textContent = state.showingBonus
+    ? 'Press Space to start timer'
+    : 'Press Space to start timer · B to buzz';
+}
+
+function onTimerExpire() {
+  const pair = state.pairs[state.pairIndex];
+  const q    = state.showingBonus ? pair.bonus : pair.tossup;
+
+  // Disable inputs
+  document.querySelectorAll('.mc-option').forEach(btn => btn.disabled = true);
+  hide('sa-reveal');
+  hide('timer-prompt');
+
+  // Show correct answer
+  const display = $('answer-display');
+  display.textContent = `TIME'S UP — ANSWER: ${q.answer}`;
+  display.className   = 'answer-display wrong';
+  show('answer-area');
+  hide('skip-btn');
+
+  // Record as timed-out
+  state.answers.push({ question: q, correct: false, skipped: false, timedOut: true, points: 0 });
+
+  show('next-btn');
+}
+
+function timedAdvance() {
+  const pair = state.pairs[state.pairIndex];
+
+  if (!state.showingBonus) {
+    // Just finished toss-up
+    const lastAnswer = state.answers[state.answers.length - 1];
+    const tossupCorrect = lastAnswer && lastAnswer.question === pair.tossup && lastAnswer.correct;
+
+    if (tossupCorrect || state.alwaysShowBonus) {
+      // Show bonus
+      state.showingBonus = true;
+      renderTimedQuestion();
+      return;
+    }
+    // Skip bonus, go to next pair
+  }
+
+  // Finished bonus (or skipping it) — next pair
+  state.showingBonus = false;
+  state.pairIndex++;
+  if (state.pairIndex >= state.pairs.length) {
+    stopTimer();
+    endQuiz();
+  } else {
+    renderTimedQuestion();
+  }
+}
+
+function handleTimedMCAnswer(selected) {
+  stopTimer();
+  const pair = state.pairs[state.pairIndex];
+  const q    = state.showingBonus ? pair.bonus : pair.tossup;
+  const correctLetter = q.answer[0];
+  const correct = selected === correctLetter;
+  const pts = correct ? (state.showingBonus ? 10 : 4) : 0;
+
+  document.querySelectorAll('.mc-option').forEach(btn => {
+    btn.disabled = true;
+    if (btn.dataset.letter === correctLetter)             btn.classList.add('correct');
+    else if (btn.dataset.letter === selected && !correct) btn.classList.add('wrong');
+  });
+
+  const display = $('answer-display');
+  display.textContent = `ANSWER: ${q.answer}` + (correct ? ` (+${pts} pts)` : '');
+  display.className   = `answer-display ${correct ? 'correct' : 'wrong'}`;
+  show('answer-area');
+  hide('skip-btn');
+
+  if (correct) state.points += pts;
+  state.answers.push({ question: q, correct, skipped: false, timedOut: false, points: pts });
+
+  $('q-score').textContent = `${state.points} pts`;
+  show('next-btn');
+}
+
+function submitTimedSAAnswer() {
+  const typed = $('sa-input').value;
+  if (!typed.trim()) return;
+  stopTimer();
+
+  const pair = state.pairs[state.pairIndex];
+  const q    = state.showingBonus ? pair.bonus : pair.tossup;
+  const correct = fuzzyMatch(typed, q.answer);
+  const pts = correct ? (state.showingBonus ? 10 : 4) : 0;
+
+  const display = $('answer-display');
+  display.textContent = `ANSWER: ${q.answer}` + (correct ? ` (+${pts} pts)` : '');
+  display.className   = `answer-display ${correct ? 'correct' : 'wrong'}`;
+
+  hide('sa-reveal');
+  hide('skip-btn');
+  show('answer-area');
+
+  if (correct) state.points += pts;
+  state.answers.push({ question: q, correct, skipped: false, timedOut: false, points: pts });
+
+  $('q-score').textContent = `${state.points} pts`;
+
+  if (!correct) {
+    if (matchesDoNotAccept(typed, q.answer)) show('dna-note');
+    show('mark-correct');
+  }
+  show('next-btn');
+}
+
+function markTimedCorrect() {
+  const last = state.answers[state.answers.length - 1];
+  const pts  = state.showingBonus ? 10 : 4;
+  last.correct = true;
+  last.points  = pts;
+  state.points += pts;
+  $('answer-display').className = 'answer-display correct';
+  $('answer-display').textContent = `ANSWER: ${last.question.answer} (+${pts} pts)`;
+  hide('mark-correct');
+  $('q-score').textContent = `${state.points} pts`;
+}
+
+function skipTimedQuestion() {
+  stopTimer();
+  const pair = state.pairs[state.pairIndex];
+  const q    = state.showingBonus ? pair.bonus : pair.tossup;
+  state.answers.push({ question: q, correct: false, skipped: true, timedOut: false, points: 0 });
+  timedAdvance();
+}
+
 function skipQuestion() {
   recordAnswer(false, true);
   advance();
@@ -355,17 +713,31 @@ function advance() {
 
 // ── Results ───────────────────────────────────────────────────────────────────
 function endQuiz() {
+  stopTimer();
+  hide('timer-bar');
+  hide('timer-prompt');
+  hide('timer-warning');
   showScreen('results');
 
   const answers  = state.answers;
   const answered = answers.filter(a => !a.skipped);
   const skipped  = answers.filter(a => a.skipped).length;
   const correct  = answered.filter(a => a.correct).length;
-  const pct      = answered.length ? Math.round((correct / answered.length) * 100) : 0;
 
-  $('score-fraction').textContent = `${correct} / ${answered.length}`;
-  $('score-pct').textContent =
-    `${pct}% correct` + (skipped ? ` · ${skipped} skipped` : '');
+  if (state.mode === 'timed') {
+    const maxPossible = state.pairs.length * 14; // 4 + 10 per pair
+    $('score-fraction').textContent = `${state.points} pts`;
+    const timedOut = answers.filter(a => a.timedOut).length;
+    let detail = `${correct} of ${answered.length} correct`;
+    if (skipped)  detail += ` · ${skipped} skipped`;
+    if (timedOut) detail += ` · ${timedOut} timed out`;
+    $('score-pct').textContent = detail;
+  } else {
+    const pct = answered.length ? Math.round((correct / answered.length) * 100) : 0;
+    $('score-fraction').textContent = `${correct} / ${answered.length}`;
+    $('score-pct').textContent =
+      `${pct}% correct` + (skipped ? ` · ${skipped} skipped` : '');
+  }
 
   renderCategoryBreakdown(answers);
   renderReview(answers);
@@ -401,16 +773,18 @@ function renderCategoryBreakdown(answers) {
 function renderReview(answers) {
   $('q-review').innerHTML = answers.map((a, i) => {
     const cls  = a.skipped ? 'skipped' : a.correct ? 'correct' : 'wrong';
-    const icon = a.skipped ? '—'       : a.correct ? '✓'       : '✗';
+    let icon   = a.skipped ? '—' : a.correct ? '✓' : '✗';
+    if (a.timedOut) icon = '⏱';
     const q    = a.question;
     const safeQ = q.question.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const safeA = q.answer.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const ptsLabel = state.mode === 'timed' ? ` · ${a.points || 0} pts` : '';
     return `
       <div class="review-item ${cls}">
         <details>
           <summary>
             <span class="review-num">Q${i + 1}</span>
-            <span class="review-cat">${q.category} · ${q.type}</span>
+            <span class="review-cat">${q.category} · ${q.type}${ptsLabel}</span>
             <span class="review-status">${icon}</span>
           </summary>
           <div class="review-body">
@@ -435,18 +809,65 @@ document.addEventListener('DOMContentLoaded', () => {
   // Filter panel — event delegation covers dynamic year/category checkboxes
   $('filter-panel').addEventListener('change', applyFilters);
 
+  // Keyboard handler for timed mode (coach controls)
+  document.addEventListener('keydown', e => {
+    // Don't intercept when typing in text fields
+    if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+    // Only act on quiz screen in timed mode
+    if (state.mode !== 'timed') return;
+    if (!$('screen-quiz').classList.contains('active')) return;
+
+    if (e.key === ' ') {
+      e.preventDefault();
+      handleSpaceKey();
+    } else if (e.key === 'b' || e.key === 'B') {
+      e.preventDefault();
+      handleBuzzKey();
+    }
+  });
+
+  // Mode toggle
+  document.querySelectorAll('input[name="mode"]').forEach(el => {
+    el.addEventListener('change', () => {
+      const timed = el.value === 'timed' && el.checked;
+      if (timed) show('timed-options'); else hide('timed-options');
+      $('mode-hint').textContent = timed
+        ? 'Timed Mode · 5s toss-up, 20s bonus, NSB scoring'
+        : 'Practice Mode · Self-paced, no timer';
+      // In timed mode, update match count to show pairs
+      updateMatchCount();
+    });
+  });
+
   // Home
   $('start-btn').addEventListener('click', startQuiz);
 
   // Quiz — Short Answer input
-  $('sa-submit-btn').addEventListener('click', submitSAAnswer);
-  $('sa-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitSAAnswer(); });
-  $('mark-correct-btn').addEventListener('click', markCorrect);
+  $('sa-submit-btn').addEventListener('click', () => {
+    if (state.mode === 'timed') submitTimedSAAnswer();
+    else submitSAAnswer();
+  });
+  $('sa-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (state.mode === 'timed') submitTimedSAAnswer();
+      else submitSAAnswer();
+    }
+  });
+  $('mark-correct-btn').addEventListener('click', () => {
+    if (state.mode === 'timed') markTimedCorrect();
+    else markCorrect();
+  });
 
   // Quiz — navigation
   $('back-btn').addEventListener('click', goBack);
-  $('next-btn').addEventListener('click', advance);
-  $('skip-btn').addEventListener('click', skipQuestion);
+  $('next-btn').addEventListener('click', () => {
+    if (state.mode === 'timed') timedAdvance();
+    else advance();
+  });
+  $('skip-btn').addEventListener('click', () => {
+    if (state.mode === 'timed') skipTimedQuestion();
+    else skipQuestion();
+  });
   $('end-btn').addEventListener('click', () => {
     if (confirm('End the quiz now? Results will be shown for questions answered so far.')) {
       endQuiz();
@@ -455,11 +876,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Results
   $('retry-btn').addEventListener('click', () => {
-    state.quiz    = shuffle(state.quiz);
-    state.index   = 0;
-    state.answers = [];
-    showScreen('quiz');
-    renderQuestion();
+    if (state.mode === 'timed') {
+      state.pairs     = shuffle(state.pairs);
+      state.pairIndex = 0;
+      state.showingBonus = false;
+      state.points    = 0;
+      state.answers   = [];
+      showScreen('quiz');
+      renderTimedQuestion();
+    } else {
+      state.quiz    = shuffle(state.quiz);
+      state.index   = 0;
+      state.answers = [];
+      showScreen('quiz');
+      renderQuestion();
+    }
   });
   $('new-quiz-btn').addEventListener('click', () => showScreen('home'));
 });

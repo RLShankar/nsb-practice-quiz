@@ -310,12 +310,89 @@ body {
 .count-input:focus { border-color: var(--primary); }
 
 .hint-text { font-size: 0.8rem; color: var(--text-3); text-align: center; }
+.hint-small { margin-top: -0.25rem; text-align: left; }
 
 /* ═════════════════════════════════════════════════════════════════ QUIZ SCREEN */
 
 /* Thin progress bar pinned to top */
 .progress-track { height: 4px; background: var(--border); width: 100%; flex-shrink: 0; }
 .progress-fill  { height: 100%; background: var(--primary); transition: width 0.3s ease; width: 0; }
+
+/* Timer bar + countdown */
+.timer-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.timer-track {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.timer-fill {
+  height: 100%;
+  width: 100%;
+  background: #f59e0b;
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+.timer-fill.urgent {
+  background: var(--wrong);
+}
+.timer-countdown {
+  font-size: 0.85rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  min-width: 2.5rem;
+  text-align: right;
+}
+.timer-countdown.urgent {
+  color: var(--wrong);
+}
+
+/* Coach prompt */
+.timer-prompt {
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-3);
+  background: #ede9fe;
+  padding: 0.3rem 0;
+  letter-spacing: 0.04em;
+}
+
+/* 5 SECONDS warning */
+.timer-warning {
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--wrong);
+  background: var(--wrong-bg);
+  padding: 0.3rem 0;
+  letter-spacing: 0.1em;
+  animation: pulse-warning 0.6s ease-in-out infinite alternate;
+}
+@keyframes pulse-warning {
+  from { opacity: 1; }
+  to   { opacity: 0.5; }
+}
+
+/* Timer expired flash */
+.timer-expired {
+  animation: flash-expired 0.4s ease-out;
+}
+@keyframes flash-expired {
+  0%   { background: var(--wrong-bg); }
+  50%  { background: var(--wrong-bd); }
+  100% { background: var(--surface); }
+}
 
 /* Quiz header strip */
 .quiz-header {

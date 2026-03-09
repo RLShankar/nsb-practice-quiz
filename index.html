@@ -100,8 +100,23 @@
           <input type="number" id="question-count" value="20" min="1" class="count-input">
         </div>
 
+        <div class="filter-group">
+          <span class="filter-label">Mode</span>
+          <div class="radio-row">
+            <label class="radio-label"><input type="radio" name="mode" value="practice" checked> Practice</label>
+            <label class="radio-label"><input type="radio" name="mode" value="timed"> Timed</label>
+          </div>
+        </div>
+
+        <div id="timed-options" class="filter-group hidden">
+          <label class="check-label">
+            <input type="checkbox" id="always-bonus"> Always show bonus
+          </label>
+          <p class="hint-text hint-small">Show bonus even after incorrect or expired toss-up</p>
+        </div>
+
         <button id="start-btn" class="btn btn-primary btn-large" disabled>Start Quiz</button>
-        <p class="hint-text">Practice Mode · Self-paced, no timer</p>
+        <p id="mode-hint" class="hint-text">Practice Mode · Self-paced, no timer</p>
       </aside>
 
     </main>
@@ -124,6 +139,15 @@
       <div class="progress-fill" id="progress-fill"></div>
     </div>
 
+    <div id="timer-bar" class="timer-bar hidden">
+      <div id="timer-track" class="timer-track">
+        <div class="timer-fill" id="timer-fill"></div>
+      </div>
+      <span id="timer-countdown" class="timer-countdown"></span>
+    </div>
+    <div id="timer-prompt" class="timer-prompt hidden">Press Space to start timer</div>
+    <div id="timer-warning" class="timer-warning hidden">5 SECONDS</div>
+
     <header class="quiz-header">
       <div class="qh-left">
         <span id="q-counter" class="q-counter">Question 1 of 20</span>
@@ -136,7 +160,7 @@
     </header>
 
     <main class="quiz-main">
-      <div class="question-card card">
+      <div id="question-card" class="question-card card">
 
         <p id="question-text" class="question-text"></p>
 
